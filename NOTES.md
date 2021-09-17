@@ -7,7 +7,8 @@ Need a file watcher component for Exo, but there are some problems:
 2. exo and dexo are often monitoring the same files; multiple
    components/workspaces may be monitoring overlapping filesets too. This is
    inefficient. Maybe not a problem for 2 or 3 watchers on a directory, but
-   efficient multiplexing of the underlying OS resources enables us to freely create many "watchers" with varying rules.
+   efficient multiplexing of the underlying OS resources enables us to freely
+   create many "watchers" with varying rules.
 3. we want to make the above efficencies available to non-core exo components
    coded in a variety of languages.
 4. It sounds like fun?
