@@ -1,6 +1,11 @@
 package api
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var TooBusy = errors.New("service too busy")
 
 type Service interface {
 	CreateWatcher(context.Context, *CreateWatcherInput) (id string, err error)

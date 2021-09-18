@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -29,8 +30,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case "POST":
 			var input api.CreateWatcherInput
 			if err := readJSON(&input, req); err != nil {
-				w.WriteHeader(http.StatusBadRequest) // TODO: client vs server error.
-				logf(req, "reading json: %v", err)
+				writeErrf(w, req, "reading json: %w", err)
 				return
 			}
 			output, err := h.Service.CreateWatcher(ctx, &input)
@@ -46,9 +46,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func writeErr(w http.ResponseWriter, req *http.Request, err error) {
+	status := http.StatusInternalServerError
+	switch {
+	case errors.Is(err, api.TooBusy):
+		status = http.StatusServiceUnavailable
+	}
+	w.WriteHeader(status)
+	if status == http.StatusInternalServerError {
+		logf(req, "reading json: %v", err)
+	} else {
+		w.Write([]byte(err.Error() + "\n"))
+	}
+}
+
+func writeErrf(w http.ResponseWriter, req *http.Request, format string, v ...interface{}) {
+	writeErr(w, req, fmt.Errorf(format, v...))
+}
+
 func writeJSONResponse(w http.ResponseWriter, req *http.Request, output interface{}, err error) {
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		writeErr(w, req, err)
 		return
 	}
 	writeJSON(w, req, output)
