@@ -12,7 +12,7 @@ type Service interface {
 	DescribeWatchers(context.Context, *DescribeWatchersInput) (*DescribeWatchersOutput, error)
 	DeleteWatchers(context.Context, *DeleteWatchersInput) error
 	GetEvents(context.Context, *GetEventsInput) (*GetEventsOutput, error)
-	// TODO: TailEvents.
+	TailEvents(context.Context, *TailEventsInput) error
 }
 
 type CreateWatcherInput struct {
@@ -56,4 +56,9 @@ type Event struct {
 	ID     string `json:"id"`
 	Action string `json:"action"`
 	Path   string `json:"path"`
+}
+
+type TailEventsInput struct {
+	WatcherID      string `json:"watcherId"`
+	SubscriptionID string `json:"subscriptionId"`
 }

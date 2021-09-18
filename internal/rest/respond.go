@@ -1,4 +1,4 @@
-package internal
+package rest
 
 import (
 	"encoding/json"
@@ -10,52 +10,18 @@ import (
 	"github.com/deref/fsw/internal/api"
 )
 
-type Handler struct {
-	Service api.Service
-}
-
-func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	switch req.URL.Path {
-
-	case "/watchers":
-		switch req.Method {
-
-		case "GET":
-			output, err := h.Service.DescribeWatchers(ctx, &api.DescribeWatchersInput{
-				// TODO: ids, tags.
-			})
-			writeJSONResponse(w, req, output, err)
-
-		case "POST":
-			var input api.CreateWatcherInput
-			if err := readJSON(&input, req); err != nil {
-				writeErrf(w, req, "reading json: %w", err)
-				return
-			}
-			output, err := h.Service.CreateWatcher(ctx, &input)
-			writeJSONResponse(w, req, output, err)
-
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
-
-	default:
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-}
-
 func writeErr(w http.ResponseWriter, req *http.Request, err error) {
 	status := http.StatusInternalServerError
 	switch {
+	case err == nil:
+		status = http.StatusOK
 	case errors.Is(err, api.TooBusy):
 		status = http.StatusServiceUnavailable
 	}
 	w.WriteHeader(status)
 	if status == http.StatusInternalServerError {
 		logf(req, "reading json: %v", err)
-	} else {
+	} else if err != nil {
 		w.Write([]byte(err.Error() + "\n"))
 	}
 }

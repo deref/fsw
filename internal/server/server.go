@@ -2,14 +2,26 @@ package server
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
+	"time"
 
 	"github.com/deref/fsw/internal/api"
+	"github.com/deref/fsw/internal/pathutil"
+	"github.com/fsnotify/fsevents"
 	"github.com/google/uuid"
 )
 
 type Service struct {
+	Publisher Publisher
+
 	messages chan message
+	events   chan []fsevents.Event
 	watchers []watcher
+}
+
+type Publisher interface {
+	Publish(subscriptionID string, event api.Event)
 }
 
 type message struct {
@@ -18,14 +30,27 @@ type message struct {
 }
 
 type watcher struct {
-	ID   string
-	Path string
+	ID              string
+	Path            string
+	SubscriptionIDs []string
 }
 
 const MaxQueueSize = 20 // TODO: Tune me.
 
 func (svc *Service) Run(ctx context.Context) {
+	svc.events = make(chan []fsevents.Event)
 	svc.messages = make(chan message, MaxQueueSize)
+
+	// TODO:
+	stream := fsevents.EventStream{
+		Events:  svc.events,
+		Paths:   []string{"/"},
+		Flags:   fsevents.FileEvents, // TODO: Include fsevents.NoDefer?
+		Latency: time.Millisecond * 30,
+	}
+	stream.Start()
+	defer stream.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -34,6 +59,35 @@ func (svc *Service) Run(ctx context.Context) {
 				msg.Err <- context.Canceled
 			}
 			return
+		case events := <-svc.events:
+			idBuf := make([]byte, 8)
+			for _, event := range events {
+				var apiEvent api.Event
+				apiEvent.Path = event.Path
+
+				binary.BigEndian.PutUint64(idBuf, event.ID)
+				apiEvent.ID = hex.EncodeToString(idBuf)
+
+				switch {
+				case (event.Flags & fsevents.ItemCreated) != 0:
+					apiEvent.Action = "create"
+				case (event.Flags & fsevents.ItemModified) != 0:
+					apiEvent.Action = "modify"
+				case (event.Flags & fsevents.ItemRemoved) != 0:
+					apiEvent.Action = "remove"
+				default:
+					// TODO: What other event types to handle?
+					continue
+				}
+
+				for _, watcher := range svc.watchers {
+					if pathutil.HasFilePathPrefix(event.Path, watcher.Path) {
+						for _, subscriptionID := range watcher.SubscriptionIDs {
+							svc.Publisher.Publish(subscriptionID, apiEvent)
+						}
+					}
+				}
+			}
 		case msg := <-svc.messages:
 			msg.Err <- msg.Thunk()
 		}
@@ -98,4 +152,8 @@ func (svc *Service) DeleteWatchers(context.Context, *api.DeleteWatchersInput) er
 
 func (svc *Service) GetEvents(context.Context, *api.GetEventsInput) (*api.GetEventsOutput, error) {
 	panic("TODO: GetEvents")
+}
+
+func (svc *Service) TailEvents(context.Context, *api.TailEventsInput) error {
+	panic("TODO: TailEvents")
 }
