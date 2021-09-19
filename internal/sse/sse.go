@@ -43,7 +43,6 @@ func (stream *Stream) Run() {
 			}
 			stream.flush()
 		case data := <-stream.data:
-			fmt.Println("DATA:", data)
 			stream.writeHeader(nil)
 			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
 				return
@@ -94,6 +93,5 @@ func (stream *Stream) SendData(data []byte) {
 func (stream *Stream) flush() {
 	if flusher, ok := stream.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
-		fmt.Println("FLUSH")
 	}
 }
