@@ -33,6 +33,7 @@ type watcher struct {
 	ID              string
 	Path            string
 	SubscriptionIDs []string
+	Tags            map[string]string
 }
 
 const MaxQueueSize = 20 // TODO: Tune me.
@@ -41,11 +42,11 @@ func (svc *Service) Run(ctx context.Context) {
 	svc.events = make(chan []fsevents.Event)
 	svc.messages = make(chan message, MaxQueueSize)
 
-	// TODO:
+	// TODO: Do not watch entire filesystem!
 	stream := fsevents.EventStream{
 		Events:  svc.events,
 		Paths:   []string{"/"},
-		Flags:   fsevents.FileEvents, // TODO: Include fsevents.NoDefer?
+		Flags:   fsevents.FileEvents,
 		Latency: time.Millisecond * 30,
 	}
 	stream.Start()
@@ -111,24 +112,69 @@ func (svc *Service) CreateWatcher(ctx context.Context, input *api.CreateWatcherI
 	id = gensym.RandomBase32()
 	// TODO: Validate path.
 	err = svc.do(func() error {
+		tags := make(map[string]string, len(input.Tags))
+		for name, value := range input.Tags {
+			tags[name] = value
+		}
 		svc.watchers = append(svc.watchers, watcher{
 			ID:   id,
 			Path: input.Path,
+			Tags: tags,
 		})
 		return nil
 	})
 	return
 }
 
+type tag struct {
+	Name  string
+	Value string
+}
+
 func (svc *Service) DescribeWatchers(ctx context.Context, input *api.DescribeWatchersInput) (output *api.DescribeWatchersOutput, err error) {
+	var ids map[string]bool
+	if input.IDs != nil {
+		ids = make(map[string]bool)
+		for _, id := range input.IDs {
+			ids[id] = true
+		}
+	}
+
+	var tags map[tag]bool
+	if input.Tags != nil {
+		tags = make(map[tag]bool)
+		for name, value := range input.Tags {
+			tags[tag{name, value}] = true
+		}
+	}
+
 	err = svc.do(func() error {
-		// TODO: handle input.IDs, etc.
-		watchers := make([]api.WatcherDescription, len(svc.watchers))
-		for i, watcher := range svc.watchers {
-			watchers[i] = api.WatcherDescription{
+		watchers := make([]api.WatcherDescription, 0, len(svc.watchers))
+		for _, watcher := range svc.watchers {
+			if !(ids == nil || ids[watcher.ID]) {
+				continue
+			}
+			if tags != nil {
+				match := false
+				for name, value := range watcher.Tags {
+					if tags[tag{name, value}] {
+						match = true
+						break
+					}
+				}
+				if !match {
+					continue
+				}
+			}
+			desc := api.WatcherDescription{
 				ID:   watcher.ID,
 				Path: watcher.Path,
+				Tags: make(map[string]string, len(watcher.Tags)),
 			}
+			for name, value := range watcher.Tags {
+				desc.Tags[name] = value
+			}
+			watchers = append(watchers, desc)
 		}
 		output = &api.DescribeWatchersOutput{
 			Watchers: watchers,
@@ -138,8 +184,40 @@ func (svc *Service) DescribeWatchers(ctx context.Context, input *api.DescribeWat
 	return
 }
 
-func (svc *Service) DeleteWatchers(context.Context, *api.DeleteWatchersInput) error {
-	panic("TODO: DeleteWatchers")
+func (svc *Service) DeleteWatchers(ctx context.Context, input *api.DeleteWatchersInput) error {
+	ids := make(map[string]bool)
+	for _, id := range input.IDs {
+		ids[id] = true
+	}
+
+	tags := make(map[tag]bool)
+	for name, value := range input.Tags {
+		tags[tag{name, value}] = true
+	}
+
+	return svc.do(func() error {
+		dst := 0
+		for i := 0; i < len(svc.watchers); i++ {
+			keep := true
+			watcher := svc.watchers[i]
+			if ids[watcher.ID] {
+				keep = false
+			} else {
+				for name, value := range watcher.Tags {
+					if tags[tag{name, value}] {
+						keep = false
+						break
+					}
+				}
+			}
+			svc.watchers[dst] = watcher
+			if keep {
+				dst++
+			}
+		}
+		svc.watchers = svc.watchers[:dst]
+		return nil
+	})
 }
 
 func (svc *Service) GetEvents(context.Context, *api.GetEventsInput) (*api.GetEventsOutput, error) {

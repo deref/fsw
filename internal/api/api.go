@@ -17,7 +17,8 @@ type Service interface {
 }
 
 type CreateWatcherInput struct {
-	Path string `json:"path"`
+	Path string            `json:"path"`
+	Tags map[string]string `json:"tags"`
 }
 
 type CreateWatcherOutput struct {
@@ -35,8 +36,9 @@ type DescribeWatchersOutput struct {
 }
 
 type WatcherDescription struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
+	ID   string            `json:"id"`
+	Path string            `json:"path"`
+	Tags map[string]string `json:"tags"`
 }
 
 type DeleteWatchersInput struct {
