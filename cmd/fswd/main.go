@@ -1,3 +1,5 @@
+// Command fswd stands for File System Watcher Daemon.
+
 package main
 
 import (
