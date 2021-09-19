@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/deref/fsw/internal/api"
-	accept "github.com/timewasted/go-accept-headers"
 )
 
 type WatcherCollection struct {
@@ -90,18 +89,14 @@ type EventCollection struct {
 
 func (coll *EventCollection) HandleGet(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	contentType, _ := accept.Negotiate(req.Header.Get("accept"), "text/event-stream", "application/json")
-	if contentType == "text/event-stream" {
-		sub := coll.Publisher.subscribe(w)
-		err := coll.Service.TailEvents(ctx, &api.TailEventsInput{
-			WatcherID:      coll.WatcherID,
-			SubscriptionID: sub.id,
-		})
-		if err != nil {
-			sub.stream.Cancel(toHttpErr(err))
-		}
-		sub.stream.Wait()
-	} else {
-		panic("TODO: handle get events")
+	sub := coll.Publisher.subscribe(w)
+	err := coll.Service.TailEvents(ctx, &api.TailEventsInput{
+		WatcherID:      coll.WatcherID,
+		After:          req.URL.Query().Get("after"),
+		SubscriptionID: sub.id,
+	})
+	if err != nil {
+		sub.stream.Cancel(toHttpErr(err))
 	}
+	sub.stream.Wait()
 }

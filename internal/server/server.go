@@ -220,10 +220,6 @@ func (svc *Service) DeleteWatchers(ctx context.Context, input *api.DeleteWatcher
 	})
 }
 
-func (svc *Service) GetEvents(context.Context, *api.GetEventsInput) (*api.GetEventsOutput, error) {
-	panic("TODO: GetEvents")
-}
-
 func (svc *Service) TailEvents(ctx context.Context, input *api.TailEventsInput) error {
 	return svc.do(func() error {
 		for i, watcher := range svc.watchers {
