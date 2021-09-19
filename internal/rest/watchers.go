@@ -98,8 +98,7 @@ func (coll *EventCollection) HandleGet(w http.ResponseWriter, req *http.Request)
 			SubscriptionID: sub.id,
 		})
 		if err != nil {
-			sub.stream.Cancel()
-			logf(req, "starting event stream: %v", err)
+			sub.stream.Cancel(toHttpErr(err))
 		}
 		sub.stream.Wait()
 	} else {

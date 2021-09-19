@@ -30,7 +30,7 @@ func (pub *Publisher) Shutdown() {
 	pub.mx.Lock()
 	defer pub.mx.Unlock()
 	for _, sub := range pub.subs {
-		sub.stream.Cancel()
+		sub.stream.Cancel(nil)
 	}
 }
 

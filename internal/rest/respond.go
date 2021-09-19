@@ -8,21 +8,35 @@ import (
 	"net/http"
 
 	"github.com/deref/fsw/internal/api"
+	"github.com/deref/fsw/internal/httputil"
 )
 
-func writeErr(w http.ResponseWriter, req *http.Request, err error) {
-	status := http.StatusInternalServerError
+func toHttpErr(err error) *httputil.Error {
+	httpErr := &httputil.Error{
+		Wrapped: err,
+	}
 	switch {
 	case err == nil:
-		status = http.StatusOK
+		httpErr = nil
 	case errors.Is(err, api.TooBusy):
-		status = http.StatusServiceUnavailable
+		httpErr.Status = http.StatusServiceUnavailable
+	case errors.Is(err, api.NotFound):
+		httpErr.Status = http.StatusNotFound
+	default:
+		httpErr = httputil.InternalServerError
 	}
-	w.WriteHeader(status)
-	if status == http.StatusInternalServerError {
-		logf(req, "reading json: %v", err)
-	} else if err != nil {
-		w.Write([]byte(err.Error() + "\n"))
+	return httpErr
+}
+
+func writeErr(w http.ResponseWriter, req *http.Request, err error) {
+	httpErr := toHttpErr(err)
+	if httpErr == nil {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		if httpErr.Status == http.StatusInternalServerError {
+			// XXX log err
+		}
+		httputil.WriteErr(w, httpErr)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"time"
 
 	"github.com/deref/fsw/internal/api"
@@ -157,6 +156,6 @@ func (svc *Service) TailEvents(ctx context.Context, input *api.TailEventsInput) 
 			svc.watchers[i] = watcher
 			return nil
 		}
-		return errors.New("watcher not found")
+		return api.NotFound
 	})
 }

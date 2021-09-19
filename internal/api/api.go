@@ -6,6 +6,7 @@ import (
 )
 
 var TooBusy = errors.New("service too busy")
+var NotFound = errors.New("not found")
 
 type Service interface {
 	CreateWatcher(context.Context, *CreateWatcherInput) (id string, err error)
