@@ -11,15 +11,20 @@ import (
 func main() {
 	ctx := context.Background()
 
-	svc := &server.Service{}
+	publisher := rest.NewPublisher()
+	defer publisher.Shutdown()
+
+	svc := &server.Service{
+		Publisher: publisher,
+	}
 
 	root := &rest.Root{
-		Service: svc,
+		Service:   svc,
+		Publisher: publisher,
 	}
 	handler := &rest.ResourceHandler{
 		Resource: root,
 	}
-	svc.Publisher = root
 
 	go svc.Run(ctx)
 

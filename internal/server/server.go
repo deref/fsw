@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	"github.com/deref/fsw/internal/api"
 	"github.com/deref/fsw/internal/pathutil"
+	"github.com/deref/fsw/internal/uuidutil"
 	"github.com/fsnotify/fsevents"
-	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -108,7 +109,7 @@ func (svc *Service) do(thunk func() error) error {
 }
 
 func (svc *Service) CreateWatcher(ctx context.Context, input *api.CreateWatcherInput) (id string, err error) {
-	id = randomUUID()
+	id = uuidutil.RandomString()
 	// TODO: Validate path.
 	err = svc.do(func() error {
 		svc.watchers = append(svc.watchers, watcher{
@@ -118,14 +119,6 @@ func (svc *Service) CreateWatcher(ctx context.Context, input *api.CreateWatcherI
 		return nil
 	})
 	return
-}
-
-func randomUUID() string {
-	uid, err := uuid.NewRandom()
-	if err != nil {
-		panic(err)
-	}
-	return uid.String()
 }
 
 func (svc *Service) DescribeWatchers(ctx context.Context, input *api.DescribeWatchersInput) (output *api.DescribeWatchersOutput, err error) {
@@ -154,6 +147,16 @@ func (svc *Service) GetEvents(context.Context, *api.GetEventsInput) (*api.GetEve
 	panic("TODO: GetEvents")
 }
 
-func (svc *Service) TailEvents(context.Context, *api.TailEventsInput) error {
-	panic("TODO: TailEvents")
+func (svc *Service) TailEvents(ctx context.Context, input *api.TailEventsInput) error {
+	return svc.do(func() error {
+		for i, watcher := range svc.watchers {
+			if watcher.ID != input.WatcherID {
+				continue
+			}
+			watcher.SubscriptionIDs = append(watcher.SubscriptionIDs, input.SubscriptionID)
+			svc.watchers[i] = watcher
+			return nil
+		}
+		return errors.New("watcher not found")
+	})
 }

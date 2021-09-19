@@ -3,14 +3,16 @@ package rest
 import "github.com/deref/fsw/internal/api"
 
 type Root struct {
-	Service api.Service
+	Service   api.Service
+	Publisher *Publisher
 }
 
 func (root *Root) Subresource(key string) interface{} {
 	switch key {
 	case "watchers":
 		return &WatcherCollection{
-			Service: root.Service,
+			Service:   root.Service,
+			Publisher: root.Publisher,
 		}
 	case "tags":
 		return &TagCollection{
@@ -19,8 +21,4 @@ func (root *Root) Subresource(key string) interface{} {
 	default:
 		return nil
 	}
-}
-
-// XXX don't put this on root
-func (root *Root) Publish(subscriptionID string, event api.Event) {
 }

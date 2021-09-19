@@ -4,10 +4,12 @@ import (
 	"net/http"
 
 	"github.com/deref/fsw/internal/api"
+	accept "github.com/timewasted/go-accept-headers"
 )
 
 type WatcherCollection struct {
-	Service api.Service
+	Service   api.Service
+	Publisher *Publisher
 }
 
 func (coll *WatcherCollection) HandleGet(w http.ResponseWriter, req *http.Request) {
@@ -36,14 +38,16 @@ func (coll *WatcherCollection) HandlePost(w http.ResponseWriter, req *http.Reque
 
 func (coll *WatcherCollection) Subresource(key string) interface{} {
 	return &Watcher{
-		Service: coll.Service,
-		ID:      key,
+		Service:   coll.Service,
+		Publisher: coll.Publisher,
+		ID:        key,
 	}
 }
 
 type Watcher struct {
-	Service api.Service
-	ID      string
+	Service   api.Service
+	Publisher *Publisher
+	ID        string
 }
 
 func (watcher *Watcher) HandleGet(w http.ResponseWriter, req *http.Request) {
@@ -73,18 +77,31 @@ func (watcher *Watcher) HandleDelete(w http.ResponseWriter, req *http.Request) {
 func (watcher *Watcher) Subresource(key string) interface{} {
 	return &EventCollection{
 		Service:   watcher.Service,
+		Publisher: watcher.Publisher,
 		WatcherID: watcher.ID,
 	}
 }
 
 type EventCollection struct {
 	Service   api.Service
+	Publisher *Publisher
 	WatcherID string
 }
 
 func (coll *EventCollection) HandleGet(w http.ResponseWriter, req *http.Request) {
-	if req.Header.Get("Content-Type") == "text/event-stream" {
-		panic("TODO: handle stream events")
+	ctx := req.Context()
+	contentType, _ := accept.Negotiate(req.Header.Get("accept"), "text/event-stream", "application/json")
+	if contentType == "text/event-stream" {
+		sub := coll.Publisher.subscribe(w)
+		err := coll.Service.TailEvents(ctx, &api.TailEventsInput{
+			WatcherID:      coll.WatcherID,
+			SubscriptionID: sub.id,
+		})
+		if err != nil {
+			sub.stream.Cancel()
+			logf(req, "starting event stream: %v", err)
+		}
+		sub.stream.Wait()
 	} else {
 		panic("TODO: handle get events")
 	}
