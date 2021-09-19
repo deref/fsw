@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/deref/fsw/internal/api"
+	"github.com/deref/fsw/internal/gensym"
 	"github.com/deref/fsw/internal/pathutil"
-	"github.com/deref/fsw/internal/uuidutil"
 	"github.com/fsnotify/fsevents"
 )
 
@@ -108,7 +108,7 @@ func (svc *Service) do(thunk func() error) error {
 }
 
 func (svc *Service) CreateWatcher(ctx context.Context, input *api.CreateWatcherInput) (id string, err error) {
-	id = uuidutil.RandomString()
+	id = gensym.RandomBase32()
 	// TODO: Validate path.
 	err = svc.do(func() error {
 		svc.watchers = append(svc.watchers, watcher{

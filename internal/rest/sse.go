@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/deref/fsw/internal/api"
+	"github.com/deref/fsw/internal/gensym"
 	"github.com/deref/fsw/internal/sse"
-	"github.com/deref/fsw/internal/uuidutil"
 )
 
 type Publisher struct {
@@ -39,7 +39,7 @@ func (pub *Publisher) subscribe(w http.ResponseWriter) *Subscription {
 	defer pub.mx.Unlock()
 
 	sub := &Subscription{
-		id: uuidutil.RandomString(),
+		id: gensym.RandomBase32(),
 		stream: &sse.Stream{
 			ResponseWriter: w,
 		},

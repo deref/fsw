@@ -41,11 +41,14 @@ func (stream *Stream) Run() {
 			if _, err := fmt.Fprintf(w, "; %s\n\n", time.Now().UTC()); err != nil {
 				return
 			}
+			stream.flush()
 		case data := <-stream.data:
+			fmt.Println("DATA:", data)
 			stream.writeHeader(nil)
 			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
 				return
 			}
+			stream.flush()
 		}
 	}
 }
@@ -85,5 +88,12 @@ func (stream *Stream) SendData(data []byte) {
 	default:
 		// Slow consumer.
 		stream.Cancel(nil)
+	}
+}
+
+func (stream *Stream) flush() {
+	if flusher, ok := stream.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+		fmt.Println("FLUSH")
 	}
 }
